@@ -37,6 +37,9 @@ with open('users.pkl', 'rb') as file:
 
 with open('device_groups.pkl', 'rb') as file:
 	device_groups = pickle.load(file)
+
+with open('RPDRA_mapping.pkl', 'rb') as file:
+	RPDRA_mapping = pickle.load(file)
 ################################################################
 # Functions other than mysql
 
@@ -97,10 +100,10 @@ def commit_job_ends(user_privileges):
 	for device_label in user_privileges:
 		for privilege in user_privileges[device_label]:
 			# print(privilege, device_label)
-			cursor.execute("INSERT INTO Resource_ownership (Owner, Task, Device, Privilege, Timestamp,  Status) VALUES ('System', 'End Task', %s, %s, CURRENT_TIME() , 'Available');",(device_label,privilege))
+			cursor.execute("INSERT INTO Resource_ownership (Owner, Device, Privilege, Timestamp,  Status) VALUES ('System', %s, %s, CURRENT_TIME() , 'End');",(device_label,privilege))
 			conn.commit()
 			# resource_master_list[(device_label, privilege)] = 'available'
-			resource_master_list[(device_label, privilege)] += 1
+			# resource_master_list[(device_label, privilege)] += 1
 
 			#commit privilege, device mysql unoccupied command.
 
@@ -110,21 +113,21 @@ def initialize_resource_status():
 	cursor.execute('Truncate API_Request;')
 	conn.commit()
 	#make all resources to availble and commit.
-	resource_master_list = {}
+	# resource_master_list = {}
 	for group in device_groups:
 		for privilege in group.device_privilege_list:
 			# resource_master_list[(device.label, privilege)] = 'available'
-			resource_master_list[privilege] = 1
+			# resource_master_list[privilege] = 1
 			#Since in EGRAC only one user can control the session.
 			# print('yesssssss')
-			cursor.execute("INSERT INTO Resource_ownership (Owner, Task, Device, Privilege, Timestamp,  Status) VALUES ('System', 'Initial', %s, %s, CURRENT_TIME() , 'Available');",(device.label,privilege))
+			cursor.execute("INSERT INTO Resource_ownership (Owner, Device, Privilege, Timestamp,  Status) VALUES ('System', %s, %s, CURRENT_TIME() , 'Available');",privilege)
 			conn.commit()
-	return resource_master_list
+	# return resource_master_list
 ################################################################
 #Server initialization and endpoint code.
 
-resource_master_list = initialize_resource_status()
-print(resource_master_list)
+initialize_resource_status()
+# print(resource_master_list)
 
 @app.route("/test", methods=["POST"])
 def test():
@@ -135,7 +138,8 @@ def test():
 
 	user_request_dict = json.loads(d)
 	user_name = user_request_dict['User']
-	task_name = user_request_dict['Session']
+	#Sessions not needed to be named.
+	# task_name = user_request_dict['Session']
 	#Record the request and its response in the table.
 	#Get user object.
 	user_object = []
@@ -146,62 +150,65 @@ def test():
 		print("User not registered in the house.")
 		# INSERT INTO API_Request(User, Task, Timestamp, Validity, Status, ip_address, Message, Resources_allowed) VALUES('krsna', 'Cook Food', CURRENT_TIME() ,
 		#0, 'Failed',  INET_ATON('127.0.0.1'),'User not registered in the house.','None');
-		cursor.execute("INSERT INTO API_Request (User, Task, Timestamp, Validity, Status, ip_address, Message, Resources_allowed) VALUES (%s, %s, CURRENT_TIME(), 0, 'Failed',  INET_ATON(%s),'User not registered in the house.','None');",(user_name, task_name,ip_addr))
+		cursor.execute("INSERT INTO API_Request (User, Timestamp, Validity, Status, ip_address, Message, Resources_allowed) VALUES (%s, CURRENT_TIME(), 0, 'Failed',  INET_ATON(%s),'User not registered in the house.','None');",(user_name, ip_addr))
 		conn.commit()
 		return {"System response":"User not registered in the house."}
-	# for task in task_objects:
-		# print(task.name)
-		# print(task_name)
-		# print('888888888889888')
-		# if task_name == task.name:
-			#Converting time to minutes.
-			# time = task.time * 60
-			# user_privileges = task.validity_check(user_object)
-			# print((user_privileges))
-	user_role = user_object.roles_list
-	#Get roles, select thatrole for the session(maybe this can be requested or sessions can be defined) and get groups active for the session.
-	# user_privileges = 
-			#user privileges is a dict of device labels and privilege list as values.
-	#Search the task directory, validate and 
-	#get users eligible privieges using a function.
-	if not user_privileges:
-		cursor.execute("INSERT INTO API_Request (User, Task, Timestamp, Validity, Status, ip_address, Message, Resources_allowed) VALUES (%s, %s, CURRENT_TIME(), 0, 'Failed',  INET_ATON(%s),'Task not defined by home owner.','None');",(user_name, task_name,ip_addr))
-		conn.commit()
-		return {"System response":"Task not defined by home owner."}
+
 	
-	#Get environment restrictions for the user here.
+
+	#Get current environment conditions.
 	current_environments = current_time_variables()
 	a = [str(x).lower() for x in current_environments]
-	#Check restricted privileges for the current role in session.
-	b = [str(x).lower() for x in user_object.restricted_environment]
-	# print(dir(user_object))
-	print(a)
-	print(b)
-	if user_object.restricted_environment:
-		if not set(a).isdisjoint(b):
-			cursor.execute("INSERT INTO API_Request (User, Task, Timestamp, Validity, Status, ip_address, Message, Resources_allowed) VALUES (%s, %s, CURRENT_TIME(), 0, 'Failed',  INET_ATON(%s),'User is restricted to perform task in the current environment.','None');",(user_name, task_name,ip_addr))
-			conn.commit()
-			return {"System response":"User is restricted to perform task in the current environment.","environment":b}
 
-	#Proper user, time and task. Allowed task.
-	cursor.execute("INSERT INTO API_Request (User, Task, Timestamp, Validity, Status, ip_address, Message, Resources_allowed) VALUES (%s, %s, CURRENT_TIME(), %s, 'Success',  INET_ATON(%s),'User has been given privileges of the task.',%s);",(user_name, task_name, str(time),ip_addr, json.dumps(user_privileges)))
+	#Get all roles of a user.
+	user_roles = user_object.roles_list
+	no_role_flag = True
+	all_privileges = {}
+	for tup in RPDRA_mapping:
+		current_role_object = tup[0][0]
+		current_environment_object = tup[0][1]
+		current_device_group = tup[1] 
+		for role in user_roles:
+			if role == current_role_object:
+				#Check for environment compatability.
+				b = [str(x).lower() for x in current_environment_object.restricted_envs]
+				if set(a).isdisjoint(b):
+					no_role_flag = True
+					all_privileges[current_role_object.name] = current_device_group.device_privilege_list
+					#The above code collects all privileges of a role in RDPRA mapping.
+		
+	#Converting formats to out Task based system.
+	user_privileges = {}
+	for tup in user_privileges:
+		if tup[0] not in user_privileges.keys():
+			user_privileges[tup[0]] = [tup[1]]
+		else:
+			user_privileges[tup[0]].append(tup[1])
+
+	if no_role_flag:
+		cursor.execute("INSERT INTO API_Request (User, Timestamp, Validity, Status, ip_address, Message, Resources_allowed) VALUES (%s, CURRENT_TIME(), 0, 'Failed',  INET_ATON(%s),'User is has no privileges in the current environment.','None');",(user_name, ip_addr))
+		conn.commit()
+		return {"System response":"User has no privileges in the current environment.","environment":b}
+	else:
+		cursor.execute("INSERT INTO API_Request (User, Timestamp, Validity, Status, ip_address, Message, Resources_allowed) VALUES (%s, CURRENT_TIME(), %s, 'Success',  INET_ATON(%s),'User has these privileges in the current environment.',%s);",(user_name, str(time),ip_addr, json.dumps(user_privileges)))
+		conn.commit()
+	#Get roles, select thatrole for the session(those which are active in this env) and
+	#get groups active for the session.
+	
+
+	#TO DO:Write code to commit into db perpetually, returning current privileges.
+	#Every few hours, calculate the difference in privileges and commit them end. do A-B make them start,
+	#Do B-A, make them free.
+	#Make a global function to get all privileges at a point.
+	#Make a timed function that calls this function, puts them in a db and end commits the prev privileges.
+
 	#Loop through all resources in each device and commit them.
 	for device_label in user_privileges:
 		for privilege in user_privileges[device_label]:
-			# if resource_master_list[(device_label, privilege)] == 'available':
-			if resource_master_list[(device_label, privilege)]:
-				# print(privilege, device_label)
-				cursor.execute("INSERT INTO Resource_ownership (Owner, Task, Device, Privilege, Timestamp,  Status) VALUES (%s, %s, %s, %s, CURRENT_TIME() , 'Occupied');",(user_name, task_name,device_label,privilege))
-				conn.commit()
-				# resource_master_list[(device_label, privilege)] = 'occupied'
-				resource_master_list[(device_label, privilege)] -= 1
-			else:
-				print(device_label+ privilege+" is occupied.")
-	t = threading.Timer(time, commit_job_ends, [user_privileges])
-	t.start()
-	print('User has been given privileges of the task for %d seconds.'% (time))
-	#TO DO: Inform user about the non-available resources not granted.
-	return {"System response":("User has been given privileges of the task for %d seconds." %(time)), "privileges":user_privileges}
+			cursor.execute("INSERT INTO Resource_ownership (Owner, Device, Privilege, Timestamp,  Status) VALUES (%s, %s, %s, CURRENT_TIME() , 'Start');",(user_name, device_label,privilege))
+			conn.commit()
+
+	return {"System response":("User has the following privileges currently."), "privileges":user_privileges}
 
 if __name__ == '__main__':
 	app.run()

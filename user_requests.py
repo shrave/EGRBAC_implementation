@@ -3,12 +3,10 @@ import requests
 
 user_name = input ("Enter name of the user :")
 
-task_name = input("Enter session requested : ")
 
-print(user_name+' requesting to perform '+task_name + ' session...')
+print(user_name+' currently has these privileges for the session')
 user_request_dict = {
-    "User": user_name,
-    "Session": task_name
+	"User": user_name,
 }
 jsonData = json.dumps(user_request_dict)
 
