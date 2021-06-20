@@ -95,6 +95,14 @@ def current_time_variables():
 
 ################################################################
 #Mysql-resource based functions.
+def begin_job_commit(user_privileges, user_object):
+	#Loop through all resources in each device and commit them.
+	user_name = user_object.name
+	for device_label in user_privileges:
+		for privilege in user_privileges[device_label]:
+			cursor.execute("INSERT INTO Resource_ownership (Owner, Device, Privilege, Timestamp,  Status) VALUES (%s, %s, %s, CURRENT_TIME() , 'Start');",(user_name, device_label,privilege))
+			conn.commit()
+
 
 def commit_job_ends(user_privileges):
 	for device_label in user_privileges:
@@ -106,6 +114,43 @@ def commit_job_ends(user_privileges):
 			# resource_master_list[(device_label, privilege)] += 1
 
 			#commit privilege, device mysql unoccupied command.
+def get_current_user_privileges(user_object):
+	#Get current environment conditions.
+	current_environments = current_time_variables()
+	a = [str(x).lower() for x in current_environments]
+
+	#Get all roles of a user.
+	user_roles = user_object.roles_list
+	no_role_flag = True
+	all_privileges = {}
+	for tup in RPDRA_mapping:
+		current_role_object = tup[0][0]
+		current_environment_object = tup[0][1]
+		current_device_group = tup[1] 
+		for role in user_roles:
+			if role == current_role_object:
+				#Check for environment compatability.
+				b = [str(x).lower() for x in current_environment_object.restricted_envs]
+				if set(a).isdisjoint(b):
+					no_role_flag = True
+					all_privileges[current_role_object.name] = current_device_group.device_privilege_list
+					#The above code collects all privileges of a role in RDPRA mapping.
+		
+	#Converting formats to out Task based system.
+	user_privileges = {}
+	for tup in user_privileges:
+		if tup[0] not in user_privileges.keys():
+			user_privileges[tup[0]] = [tup[1]]
+		else:
+			user_privileges[tup[0]].append(tup[1])
+	return user_privileges
+
+def update_user_every_hour(user_object):
+	user_privileges = get_current_user_privileges(user_object)
+	commit_job_ends(user_privileges)
+	threading.Timer(60*60, update_user_every_hour,[user_object]).start()
+	begin_job_commit(user_privileges, user_object)
+
 
 def initialize_resource_status():
 	#Clear all tables.
@@ -154,38 +199,10 @@ def test():
 		conn.commit()
 		return {"System response":"User not registered in the house."}
 
-	
+	#Getting current user privilges.
+	user_privileges = get_current_user_privileges(user_object)
 
-	#Get current environment conditions.
-	current_environments = current_time_variables()
-	a = [str(x).lower() for x in current_environments]
-
-	#Get all roles of a user.
-	user_roles = user_object.roles_list
-	no_role_flag = True
-	all_privileges = {}
-	for tup in RPDRA_mapping:
-		current_role_object = tup[0][0]
-		current_environment_object = tup[0][1]
-		current_device_group = tup[1] 
-		for role in user_roles:
-			if role == current_role_object:
-				#Check for environment compatability.
-				b = [str(x).lower() for x in current_environment_object.restricted_envs]
-				if set(a).isdisjoint(b):
-					no_role_flag = True
-					all_privileges[current_role_object.name] = current_device_group.device_privilege_list
-					#The above code collects all privileges of a role in RDPRA mapping.
-		
-	#Converting formats to out Task based system.
-	user_privileges = {}
-	for tup in user_privileges:
-		if tup[0] not in user_privileges.keys():
-			user_privileges[tup[0]] = [tup[1]]
-		else:
-			user_privileges[tup[0]].append(tup[1])
-
-	if no_role_flag:
+	if not user_privileges:
 		cursor.execute("INSERT INTO API_Request (User, Timestamp, Validity, Status, ip_address, Message, Resources_allowed) VALUES (%s, CURRENT_TIME(), 0, 'Failed',  INET_ATON(%s),'User is has no privileges in the current environment.','None');",(user_name, ip_addr))
 		conn.commit()
 		return {"System response":"User has no privileges in the current environment.","environment":b}
@@ -202,13 +219,15 @@ def test():
 	#Make a global function to get all privileges at a point.
 	#Make a timed function that calls this function, puts them in a db and end commits the prev privileges.
 
-	#Loop through all resources in each device and commit them.
-	for device_label in user_privileges:
-		for privilege in user_privileges[device_label]:
-			cursor.execute("INSERT INTO Resource_ownership (Owner, Device, Privilege, Timestamp,  Status) VALUES (%s, %s, %s, CURRENT_TIME() , 'Start');",(user_name, device_label,privilege))
-			conn.commit()
+	# #Loop through all resources in each device and commit them.
+	# for device_label in user_privileges:
+	# 	for privilege in user_privileges[device_label]:
+	# 		cursor.execute("INSERT INTO Resource_ownership (Owner, Device, Privilege, Timestamp,  Status) VALUES (%s, %s, %s, CURRENT_TIME() , 'Start');",(user_name, device_label,privilege))
+	# 		conn.commit()
 
 	return {"System response":("User has the following privileges currently."), "privileges":user_privileges}
 
 if __name__ == '__main__':
+	for user in user_list:
+		update_user_every_hour(user_object)
 	app.run()
