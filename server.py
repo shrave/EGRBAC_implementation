@@ -38,6 +38,9 @@ with open('users.pkl', 'rb') as file:
 with open('device_groups.pkl', 'rb') as file:
 	device_groups = pickle.load(file)
 
+with open('envs.pkl', 'rb') as file:
+	environments = pickle.load(file)
+
 with open('RPDRA_mapping.pkl', 'rb') as file:
 	RPDRA_mapping = pickle.load(file)
 ################################################################
@@ -107,7 +110,7 @@ def begin_job_commit(user_privileges, user_object):
 def commit_job_ends(user_privileges):
 	for device_label in user_privileges:
 		for privilege in user_privileges[device_label]:
-			# print(privilege, device_label)
+			print(privilege, device_label)
 			cursor.execute("INSERT INTO Resource_ownership (Owner, Device, Privilege, Timestamp,  Status) VALUES ('System', %s, %s, CURRENT_TIME() , 'End');",(device_label,privilege))
 			conn.commit()
 			# resource_master_list[(device_label, privilege)] = 'available'
@@ -120,29 +123,41 @@ def get_current_user_privileges(user_object):
 	a = [str(x).lower() for x in current_environments]
 
 	#Get all roles of a user.
-	user_roles = user_object.roles_list
+	user_roles = user_object.roles
+	# print(user_roles)
 	no_role_flag = True
 	all_privileges = {}
 	for tup in RPDRA_mapping:
 		current_role_object = tup[0][0]
 		current_environment_object = tup[0][1]
-		current_device_group = tup[1] 
+		current_device_group = tup[1]
 		for role in user_roles:
-			if role == current_role_object:
+			# print(role.name)
+			# print('--------')
+			# print(current_role_object.name)
+			if role.name == current_role_object.name:
 				#Check for environment compatability.
 				b = [str(x).lower() for x in current_environment_object.restricted_envs]
+				# print(a)
+				# print('8888888')
+				# print(b)
 				if set(a).isdisjoint(b):
 					no_role_flag = True
 					all_privileges[current_role_object.name] = current_device_group.device_privilege_list
 					#The above code collects all privileges of a role in RDPRA mapping.
-		
+	# print(all_privileges)
 	#Converting formats to out Task based system.
 	user_privileges = {}
-	for tup in user_privileges:
-		if tup[0] not in user_privileges.keys():
-			user_privileges[tup[0]] = [tup[1]]
-		else:
-			user_privileges[tup[0]].append(tup[1])
+	for tup in all_privileges:
+		# print(tup)
+		# print(all_privileges[tup])
+		for j in all_privileges[tup]:
+			# print(j)
+			if j[0] not in user_privileges.keys():
+				user_privileges[j[0]] = [j[1]]
+			else:
+				user_privileges[j[0]].append(j[1])
+	# print(user_privileges)
 	return user_privileges
 
 def update_user_every_hour(user_object):
@@ -170,7 +185,26 @@ def initialize_resource_status():
 	# return resource_master_list
 ################################################################
 #Server initialization and endpoint code.
+def get_user_object(name):
+	for r in user_list:
+		# print(r.name)
+		if r.name == name:
+			return r
+def get_role_object(name):
+	for r in roles_list:
+		if r.name == name:
+			return r
 
+def get_group_object(name):
+	for d in device_groups:
+		if d.group_name == name:
+			return d
+
+def get_env_object(name):
+	for d in environments:
+		if d.name == name:
+			return d
+################################################################
 initialize_resource_status()
 # print(resource_master_list)
 
@@ -195,19 +229,20 @@ def test():
 		print("User not registered in the house.")
 		# INSERT INTO API_Request(User, Task, Timestamp, Validity, Status, ip_address, Message, Resources_allowed) VALUES('krsna', 'Cook Food', CURRENT_TIME() ,
 		#0, 'Failed',  INET_ATON('127.0.0.1'),'User not registered in the house.','None');
-		cursor.execute("INSERT INTO API_Request (User, Timestamp, Validity, Status, ip_address, Message, Resources_allowed) VALUES (%s, CURRENT_TIME(), 0, 'Failed',  INET_ATON(%s),'User not registered in the house.','None');",(user_name, ip_addr))
+		cursor.execute("INSERT INTO API_Request (User, Timestamp, Status, ip_address, Message, Resources_allowed) VALUES (%s, CURRENT_TIME(), 'Failed',  INET_ATON(%s),'User not registered in the house.','None');",(user_name, ip_addr))
 		conn.commit()
 		return {"System response":"User not registered in the house."}
 
 	#Getting current user privilges.
 	user_privileges = get_current_user_privileges(user_object)
-
+	# print(user_privileges)
 	if not user_privileges:
-		cursor.execute("INSERT INTO API_Request (User, Timestamp, Validity, Status, ip_address, Message, Resources_allowed) VALUES (%s, CURRENT_TIME(), 0, 'Failed',  INET_ATON(%s),'User is has no privileges in the current environment.','None');",(user_name, ip_addr))
+		cursor.execute("INSERT INTO API_Request (User, Timestamp, Status, ip_address, Message, Resources_allowed) VALUES (%s, CURRENT_TIME(), 'Failed',  INET_ATON(%s),'User is has no privileges in the current environment.','None');",(user_name, ip_addr))
 		conn.commit()
-		return {"System response":"User has no privileges in the current environment.","environment":b}
+		# print('abcd')
+		return {"System response":"User has no privileges in the current environment."}
 	else:
-		cursor.execute("INSERT INTO API_Request (User, Timestamp, Validity, Status, ip_address, Message, Resources_allowed) VALUES (%s, CURRENT_TIME(), %s, 'Success',  INET_ATON(%s),'User has these privileges in the current environment.',%s);",(user_name, str(time),ip_addr, json.dumps(user_privileges)))
+		cursor.execute("INSERT INTO API_Request (User, Timestamp, Status, ip_address, Message, Resources_allowed) VALUES (%s, CURRENT_TIME(), 'Success',  INET_ATON(%s),'User has these privileges in the current environment.',%s);",(user_name,ip_addr, json.dumps(user_privileges)))
 		conn.commit()
 	#Get roles, select thatrole for the session(those which are active in this env) and
 	#get groups active for the session.
@@ -229,5 +264,7 @@ def test():
 
 if __name__ == '__main__':
 	for user in user_list:
-		update_user_every_hour(user_object)
+		# user_object = get_user_object(user.name)
+		# print(user_object)
+		update_user_every_hour(user)
 	app.run()

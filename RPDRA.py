@@ -1,6 +1,7 @@
-from device_groups import device_groups
+from device_group import device_group
 from user import user
 from role import role
+import pickle
 
 def save_object(obj, filename):
 	with open(filename, 'wb') as output:  # Overwrites any existing file.
@@ -13,7 +14,7 @@ def get_role_object(name):
 
 def get_group_object(name):
 	for d in device_groups:
-		if d.name == name:
+		if d.group_name == name:
 			return d
 
 def get_env_object(name):
@@ -32,8 +33,12 @@ with open('envs.pkl', 'rb') as file:
 	environments = pickle.load(file)
 
 #This is defined by the homeowner. Keep environment group and device group.
-role_device_group_map = {('parents', , ),('kids', , ), ('neighbors', , ) ,('babySitters', , )}
+role_device_group_map = [('Owner','Any Time' , 'Owner'),('Normal', 'Any Time', 'Normal'), ('Relative','Any Time', 'Limited') , ('Child','Any Time','Child'), ('Guest','Any Time','Guest'), ('Guest Child','Any Time','Child Guest')]
 
+f = open('policy.config', 'a')
+f.write('Role Device Map\n')
+for k in role_device_group_map:
+	f.write(k[0]+'-'+k[1]+'-'+k[2]+'\n')
 
 #System code continues.
 device_groups_copy = device_groups
@@ -48,11 +53,13 @@ for mapping in role_device_group_map:
 
 	device_group_name = mapping[2]
 	device_group_object = get_group_object(device_group_name)
+	# print(device_group_name)
+	# print(device_group_object)
 	if device_group_object in device_groups_copy:
 		#Add time here as well.
 		RPDRA_mapping.append(((role_object, env_object), device_group_object))
 		device_groups_copy.remove(device_group_object)
 	else:
-		print('Role device group constraint. Cannot allot '+device_group_object.name+' to role '+role_object.name)
+		print('Role device group constraint. Cannot allot '+device_group_object.group_name+' to role '+role_object.name)
 
 save_object(RPDRA_mapping, 'RPDRA_mapping.pkl')

@@ -3,7 +3,8 @@ class environment(object):
 	def __init__(self, name):
 		super(environment, self).__init__()
 		self.name = name
-		
-	def set_restrictions(list_of_environments):
-		self.restricted_envs = list_of_environments
+		self.restricted_envs = []
+
+	def set_restrictions(self, list_of_environments =[], *args):
+		self.restricted_envs.extend(list_of_environments)
 		

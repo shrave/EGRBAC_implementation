@@ -1,1 +1,0 @@
-#Make a session and give control to roles in a session in this code.

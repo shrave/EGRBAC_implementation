@@ -1,5 +1,5 @@
 import pickle
-
+from device_group import device_group
 #Function for pickling variables.
 def save_object(obj, filename):
 	with open(filename, 'wb') as output:  # Overwrites any existing file.
@@ -16,20 +16,27 @@ with open('devices_floorplan.pkl', 'rb') as file:
 for device in device_instances:
 	for privi in device.privileges:
 		privileges.append((device.label, privi))
-print(privileges)
+# print(privileges)
 
 #Group privileges in various device groups.
-
+device_privileges = {}
 #Privilege sets different are present as dictionary and value in a list named device_privileges.
 #This space is defined by the homeowner.
-device_privileges = {}
+with open('normal_device_groups_config.pkl', 'rb') as file:
+	device_privileges = pickle.load(file)
 
-
+#Write the config to a file:
+f = open('policy.config', 'w')
+f.write('Device Groups\n')
+for j in device_privileges:
+	f.write(j)
+	for tup in device_privileges[j]:
+		f.write(tup[0]+'-'+tup[1]+'\n')
 
 #Make device group objects.
 device_group_list = []
 for name in device_privileges:
-	k = device_groups(name)
+	k = device_group(name)
 	k.add_privileges(device_privileges[name])
 	device_group_list.append(k)
 
