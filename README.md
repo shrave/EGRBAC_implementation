@@ -1,5 +1,7 @@
 # EGRBAC_implementation
 My pythonic implementation of the paper on EGBRAC for Smart home IoTs.
 
-**Ameer, Safwa, James Benson, and Ravi Sandhu. "The EGRBAC Model for Smart Home IoT." 2020 IEEE 21st International Conference on Information Reuse and Integration for Data Science (IRI). IEEE, 2020.**
+System designed in the [paper](https://profsandhu.com/confrnc/misconf/safwa-iri20.pdf).
 
+A handler that takes list of privileges, users, roles, environments as input. 
+A flask server at _server.py_ is made. At this server, any user can send a request to know their current privileges/actions.
