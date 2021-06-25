@@ -27,20 +27,24 @@ user_role_map = [('User 1', 'Owner'), ('User 2', 'Normal'), ('User 3', 'Relative
 
 #Write to policy config:
 f = open('policy.config', 'a')
-f.write('User Roles\n')
+f.write('User Roles:\n')
 for k in user_roles:
 	f.write(k+'\n')
-f.write('User Names\n')
+f.write('--------------------------\n')
+f.write('User Names:\n')
 for k in user_names:
 	f.write(k+'\n')
-f.write('Environment Roles\n')
+f.write('--------------------------\n')
+f.write('Environment Roles:\n')
 for k in environments_restriction_defs:
 	f.write(k+'\n')
 	for j in environments_restriction_defs[k]:
 		f.write(j+'\n')
-f.write('User Role Map\n')
+f.write('--------------------------\n')
+f.write('User Role Map:\n')
 for k in user_role_map:
-	f.write(k[0]+'-'+k[1]+'\n')
+	f.write('('+k[0]+','+k[1]+')'+'\n')
+f.write('--------------------------\n')
 
 #Loading these players in the space.
 role_objects_list = []

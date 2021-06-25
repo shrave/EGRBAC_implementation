@@ -27,11 +27,12 @@ with open('normal_device_groups_config.pkl', 'rb') as file:
 
 #Write the config to a file:
 f = open('policy.config', 'w')
-f.write('Device Groups\n')
+f.write('Device Groups:\n')
 for j in device_privileges:
-	f.write(j)
+	f.write(j+'\n')
 	for tup in device_privileges[j]:
-		f.write(tup[0]+'-'+tup[1]+'\n')
+		f.write('('+tup[0]+','+tup[1]+')'+'\n')
+f.write('-----------------------------------\n')
 
 #Make device group objects.
 device_group_list = []

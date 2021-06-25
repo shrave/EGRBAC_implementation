@@ -36,9 +36,10 @@ with open('envs.pkl', 'rb') as file:
 role_device_group_map = [('Owner','Any Time' , 'Owner'),('Normal', 'Any Time', 'Normal'), ('Relative','Any Time', 'Limited') , ('Child','Any Time','Child'), ('Guest','Any Time','Guest'), ('Guest Child','Any Time','Child Guest')]
 
 f = open('policy.config', 'a')
-f.write('Role Device Map\n')
+f.write('Role Device Map:\n')
 for k in role_device_group_map:
-	f.write(k[0]+'-'+k[1]+'-'+k[2]+'\n')
+	f.write('('+k[0]+','+k[1]+','+k[2]+')'+'\n')
+f.write('--------------------------\n')
 
 #System code continues.
 device_groups_copy = device_groups
